@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Practica 16 - CoreNLP vs spaCy | Teoria de Automatas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .header-practica {
+            background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+            color: white;
+            padding: 2rem 0;
+        }
+        .badge-tipo {
+            font-size: 1.1rem;
+            padding: 0.6em 1.2em;
+        }
+        .card-resultado {
+            border-left: 4px solid #1a237e;
+        }
+        .arbol-box {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .tabla-resultado th {
+            background-color: #e8eaf6;
+        }
+        #loading {
+            display: none;
+        }
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-practica">
+        <div class="container">
+            <h1 class="mb-1">Practica 16 - Analisis NLP</h1>
+            <h5 class="fw-normal">Stanford CoreNLP vs spaCy</h5>
+            <p class="mb-0 mt-2 opacity-75">
+                <strong>Integrantes:</strong> Boris Rengel, Estefania Cale, Anthony Gutierrez |
+                <strong>Docente:</strong> Jose O. Guamán Q. |
+                <strong>Julio 2026</strong>
+            </p>
+        </div>
+    </div>
+
+    <div class="container my-4">
+        <!-- Formulario de entrada -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">Entrada de Texto</h5>
+                        <div class="mb-3">
+                            <label for="selectOracion" class="form-label">Oraciones del taller:</label>
+                            <select id="selectOracion" class="form-select" onchange="cargarOracion()">
+                                <option value="">-- Seleccione una oracion --</option>
+                                <option value="Maria estudia porque manana tiene un examen.">Maria estudia porque manana tiene un examen.</option>
+                                <option value="Pedro llego y Ana salio.">Pedro llego y Ana salio.</option>
+                                <option value="Aunque llueve iremos al parque.">Aunque llueve iremos al parque.</option>
+                                <option value="Si estudias aprobaras.">Si estudias aprobaras.</option>
+                                <option value="Juan cocina mientras Ana limpia.">Juan cocina mientras Ana limpia.</option>
+                                <option value="Pedro compro un automovil.">Pedro compro un automovil.</option>
+                                <option value="Ana cocina la cena.">Ana cocina la cena.</option>
+                                <option value="Luis juega futbol.">Luis juega futbol.</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="textoEntrada" class="form-label">O escriba una oracion personalizada:</label>
+                            <textarea id="textoEntrada" class="form-control" rows="2" placeholder="Escriba aqui su oracion..."></textarea>
+                        </div>
+                        <button id="btnAnalizar" class="btn btn-primary" onclick="analizarTexto()">
+                            <span id="loading" class="spinner-border spinner-border-sm me-1"></span>
+                            Analizar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resultados -->
+        <div id="resultados" style="display:none;">
+            <!-- Badges de clasificacion -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-2">
+                    <div class="card text-center shadow-sm border-0">
+                        <div class="card-body">
+                            <small class="text-muted">Tipo de Oracion</small>
+                            <div><span id="badgeTipo" class="badge bg-primary badge-tipo mt-1">-</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="card text-center shadow-sm border-0">
+                        <div class="card-body">
+                            <small class="text-muted">Relacion Sintactica</small>
+                            <div><span id="badgeSubtipo" class="badge bg-info badge-tipo mt-1">-</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="card text-center shadow-sm border-0">
+                        <div class="card-body">
+                            <small class="text-muted">Conector Detectado</small>
+                            <div><span id="badgeConector" class="badge bg-warning text-dark badge-tipo mt-1">-</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <div class="card text-center shadow-sm border-0">
+                        <div class="card-body">
+                            <small class="text-muted">Sentimiento</small>
+                            <div><span id="badgeSentiment" class="badge badge-tipo mt-1">-</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actividad 3: SVO -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card card-resultado shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Actividad 3 - Sujeto, Verbo y Objeto</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-4 mb-2">
+                                    <div class="p-3 bg-light rounded">
+                                        <small class="text-muted d-block">Sujeto</small>
+                                        <strong id="svoSujeto" class="fs-4 text-primary">-</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <div class="p-3 bg-light rounded">
+                                        <small class="text-muted d-block">Verbo Principal</small>
+                                        <strong id="svoVerbo" class="fs-4 text-success">-</strong>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <div class="p-3 bg-light rounded">
+                                        <small class="text-muted d-block">Objeto Directo</small>
+                                        <strong id="svoObjeto" class="fs-4 text-danger">-</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clasificacion Semantica: Entidades NER -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card card-resultado shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Clasificacion Semantica - Entidades Nombradas (NER)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><span class="badge bg-secondary">CoreNLP</span></h6>
+                                    <div id="nerCoreNLP" class="mb-3">No se detectaron entidades</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><span class="badge bg-success">spaCy</span></h6>
+                                    <div id="nerSpacy">No se detectaron entidades</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Tokens y POS Tags -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card card-resultado shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Tokens y POS Tags <span class="badge bg-secondary">CoreNLP</span></h5>
+                        </div>
+                        <div class="card-body" style="max-height:350px; overflow-y:auto;">
+                            <table class="table table-sm table-striped tabla-resultado">
+                                <thead><tr><th>#</th><th>Token</th><th>POS</th></tr></thead>
+                                <tbody id="tablaTokensCN"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dependencias Sintacticas -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card card-resultado shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Dependencias Sintacticas <span class="badge bg-secondary">CoreNLP</span></h5>
+                        </div>
+                        <div class="card-body" style="max-height:350px; overflow-y:auto;">
+                            <table class="table table-sm table-striped tabla-resultado">
+                                <thead><tr><th>Relacion</th><th>Gobernante</th><th>Dependiente</th></tr></thead>
+                                <tbody id="tablaDepsCN"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Arbol Sintactico -->
+            <div class="row mb-4">
+                <div class="col-md-6 mb-4">
+                    <div class="card card-resultado shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Arbol Sintactico (Parse Tree) <span class="badge bg-secondary">CoreNLP</span></h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="arbolContainer" class="arbol-box">Arbol no disponible</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card card-resultado shadow-sm h-100">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Arbol de Dependencias <span class="badge bg-success">spaCy</span></h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="arbolSpacyContainer" class="arbol-box">Arbol no disponible</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Benchmark spaCy -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card card-resultado shadow-sm">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Analisis spaCy <span class="badge bg-success">Benchmark</span></h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <span class="badge bg-dark fs-6">Tiempo de ejecucion: <span id="spacyTiempo">-</span> ms</span>
+                            </div>
+                            <div class="row">
+                                <div class="col-lg-6">
+                                    <h6>Tokens y POS Tags (spaCy)</h6>
+                                    <div style="max-height:300px; overflow-y:auto;">
+                                        <table class="table table-sm table-striped tabla-resultado">
+                                            <thead><tr><th>#</th><th>Token</th><th>POS</th><th>Lema</th></tr></thead>
+                                            <tbody id="tablaTokensSpacy"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <h6>Dependencias (spaCy)</h6>
+                                    <div style="max-height:300px; overflow-y:auto;">
+                                        <table class="table table-sm table-striped tabla-resultado">
+                                            <thead><tr><th>Relacion</th><th>Gobernante</th><th>Dependiente</th></tr></thead>
+                                            <tbody id="tablaDepsSpacy"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensaje de error -->
+        <div id="errorContainer" class="alert alert-danger" style="display:none;"></div>
+    </div>
+
+    <footer class="text-center text-muted py-3 border-top">
+        <small>Practica 16 - Teoria de Automatas y Computabilidad Avanzada | Julio 2026</small>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function cargarOracion() {
+            const sel = document.getElementById("selectOracion");
+            const textarea = document.getElementById("textoEntrada");
+            if (sel.value) {
+                textarea.value = sel.value;
+            }
+        }
+
+        async function analizarTexto() {
+            const texto = document.getElementById("textoEntrada").value.trim();
+            if (!texto) {
+                mostrarError("Por favor ingrese o seleccione una oracion.");
+                return;
+            }
+
+            ocultarError();
+            document.getElementById("resultados").style.display = "none";
+            document.getElementById("loading").style.display = "inline-block";
+            document.getElementById("btnAnalizar").disabled = true;
+
+            try {
+                const resp = await fetch("/analizar", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ texto: texto }),
+                });
+
+                const data = await resp.json();
+
+                if (data.error) {
+                    mostrarError(data.error);
+                    return;
+                }
+
+                renderizarResultados(data);
+            } catch (err) {
+                mostrarError("Error de conexion: " + err.message);
+            } finally {
+                document.getElementById("loading").style.display = "none";
+                document.getElementById("btnAnalizar").disabled = false;
+            }
+        }
+
+        function renderizarResultados(data) {
+            const cn = data.corenlp || {};
+            const sp = data.spacy || {};
+
+            // Clasificacion
+            if (cn.clasificacion) {
+                document.getElementById("badgeTipo").textContent = cn.clasificacion.tipo;
+                document.getElementById("badgeSubtipo").textContent = cn.clasificacion.subtipo;
+                document.getElementById("badgeConector").textContent = cn.clasificacion.conector;
+            }
+
+            // Sentiment
+            if (cn.sentiment) {
+                const badgeSentiment = document.getElementById("badgeSentiment");
+                badgeSentiment.textContent = cn.sentiment;
+                const sentimentColors = {
+                    "Very positive": "bg-success",
+                    "Positive": "bg-info",
+                    "Neutral": "bg-secondary",
+                    "Negative": "bg-warning text-dark",
+                    "Very negative": "bg-danger"
+                };
+                badgeSentiment.className = "badge badge-tipo mt-1 " + (sentimentColors[cn.sentiment] || "bg-secondary");
+            }
+
+            // SVO
+            if (cn.svo) {
+                document.getElementById("svoSujeto").textContent = cn.svo.sujeto;
+                document.getElementById("svoVerbo").textContent = cn.svo.verbo;
+                document.getElementById("svoObjeto").textContent = cn.svo.objeto;
+            }
+
+            // Entidades NER CoreNLP
+            const nerCN = document.getElementById("nerCoreNLP");
+            if (cn.entidades && cn.entidades.length > 0) {
+                nerCN.innerHTML = cn.entidades.map(e =>
+                    `<span class="badge bg-primary me-1 mb-1">${e.texto} <small>(${e.tipo})</small></span>`
+                ).join("");
+            } else {
+                nerCN.innerHTML = '<span class="text-muted">No se detectaron entidades</span>';
+            }
+
+            // Entidades NER spaCy
+            const nerSp = document.getElementById("nerSpacy");
+            if (sp.entidades && sp.entidades.length > 0) {
+                nerSp.innerHTML = sp.entidades.map(e =>
+                    `<span class="badge bg-success me-1 mb-1">${e.texto} <small>(${e.tipo})</small></span>`
+                ).join("");
+            } else {
+                nerSp.innerHTML = '<span class="text-muted">No se detectaron entidades</span>';
+            }
+
+            // Tokens CoreNLP
+            const tbodyTokens = document.getElementById("tablaTokensCN");
+            tbodyTokens.innerHTML = "";
+            if (cn.tokens_pos) {
+                cn.tokens_pos.forEach((t, i) => {
+                    tbodyTokens.innerHTML += `<tr><td>${i + 1}</td><td>${t.token}</td><td><code>${t.pos}</code></td></tr>`;
+                });
+            }
+
+            // Dependencias CoreNLP
+            const tbodyDeps = document.getElementById("tablaDepsCN");
+            tbodyDeps.innerHTML = "";
+            if (cn.dependencias) {
+                cn.dependencias.forEach(d => {
+                    tbodyDeps.innerHTML += `<tr><td><code>${d.relacion}</code></td><td>${d.gobernante}</td><td>${d.dependiente}</td></tr>`;
+                });
+            }
+
+            // Arbol sintactico CoreNLP
+            document.getElementById("arbolContainer").textContent = cn.arbol || "Arbol no disponible";
+
+            // Arbol de dependencias spaCy
+            document.getElementById("arbolSpacyContainer").textContent = sp.arbol_dep || "Arbol no disponible";
+
+            // spaCy tiempo
+            document.getElementById("spacyTiempo").textContent = sp.tiempo_ms !== undefined ? sp.tiempo_ms : "-";
+
+            // Tokens spaCy
+            const tbodyTokensSp = document.getElementById("tablaTokensSpacy");
+            tbodyTokensSp.innerHTML = "";
+            if (sp.tokens_pos) {
+                sp.tokens_pos.forEach((t, i) => {
+                    tbodyTokensSp.innerHTML += `<tr><td>${i + 1}</td><td>${t.token}</td><td><code>${t.pos}</code></td><td>${t.lema}</td></tr>`;
+                });
+            }
+
+            // Dependencias spaCy
+            const tbodyDepsSp = document.getElementById("tablaDepsSpacy");
+            tbodyDepsSp.innerHTML = "";
+            if (sp.dependencias) {
+                sp.dependencias.forEach(d => {
+                    tbodyDepsSp.innerHTML += `<tr><td><code>${d.relacion}</code></td><td>${d.gobernante}</td><td>${d.dependiente}</td></tr>`;
+                });
+            }
+
+            document.getElementById("resultados").style.display = "block";
+        }
+
+        function mostrarError(msg) {
+            const c = document.getElementById("errorContainer");
+            c.textContent = msg;
+            c.style.display = "block";
+        }
+
+        function ocultarError() {
+            document.getElementById("errorContainer").style.display = "none";
+        }
+    </script>
+</body>
+</html>
