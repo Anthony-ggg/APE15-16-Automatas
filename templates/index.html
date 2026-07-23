@@ -1,445 +1,179 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Practica 16 - CoreNLP vs spaCy | Teoria de Automatas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .header-practica {
-            background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
-            color: white;
-            padding: 2rem 0;
-        }
-        .badge-tipo {
-            font-size: 1.1rem;
-            padding: 0.6em 1.2em;
-        }
-        .card-resultado {
-            border-left: 4px solid #1a237e;
-        }
-        .arbol-box {
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-            font-family: 'Courier New', monospace;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .tabla-resultado th {
-            background-color: #e8eaf6;
-        }
-        #loading {
-            display: none;
-        }
-        .spinner-border-sm {
-            width: 1rem;
-            height: 1rem;
-        }
-    </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>APE 15 y 16 | spaCy y Stanford CoreNLP</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
-    <div class="header-practica">
-        <div class="container">
-            <h1 class="mb-1">Practica 16 - Analisis NLP</h1>
-            <h5 class="fw-normal">Stanford CoreNLP vs spaCy</h5>
-            <p class="mb-0 mt-2 opacity-75">
-                <strong>Integrantes:</strong> Boris Rengel, Estefania Cale, Anthony Gutierrez |
-                <strong>Docente:</strong> Jose O. Guamán Q. |
-                <strong>Julio 2026</strong>
-            </p>
+<header class="hero">
+    <div class="container">
+        <p class="eyebrow">Teoría de Autómatas y Computabilidad Avanzada</p>
+        <h1>Analizador léxico, sintáctico y semántico</h1>
+        <p class="subtitle">APE 15: spaCy · APE 16: Stanford CoreNLP · Comparación automática</p>
+        <p class="members"><strong>Integrantes:</strong> Boris Rengel, Estefanía Cale y Anthony Gutiérrez</p>
+        <div id="health" class="health" aria-live="polite">
+            <span class="status waiting">Comprobando herramientas…</span>
         </div>
     </div>
+</header>
 
-    <div class="container my-4">
-        <!-- Formulario de entrada -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title">Entrada de Texto</h5>
-                        <div class="mb-3">
-                            <label for="selectOracion" class="form-label">Oraciones del taller:</label>
-                            <select id="selectOracion" class="form-select" onchange="cargarOracion()">
-                                <option value="">-- Seleccione una oracion --</option>
-                                <option value="Maria estudia porque manana tiene un examen.">Maria estudia porque manana tiene un examen.</option>
-                                <option value="Pedro llego y Ana salio.">Pedro llego y Ana salio.</option>
-                                <option value="Aunque llueve iremos al parque.">Aunque llueve iremos al parque.</option>
-                                <option value="Si estudias aprobaras.">Si estudias aprobaras.</option>
-                                <option value="Juan cocina mientras Ana limpia.">Juan cocina mientras Ana limpia.</option>
-                                <option value="Pedro compro un automovil.">Pedro compro un automovil.</option>
-                                <option value="Ana cocina la cena.">Ana cocina la cena.</option>
-                                <option value="Luis juega futbol.">Luis juega futbol.</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="textoEntrada" class="form-label">O escriba una oracion personalizada:</label>
-                            <textarea id="textoEntrada" class="form-control" rows="2" placeholder="Escriba aqui su oracion..."></textarea>
-                        </div>
-                        <button id="btnAnalizar" class="btn btn-primary" onclick="analizarTexto()">
-                            <span id="loading" class="spinner-border spinner-border-sm me-1"></span>
-                            Analizar
-                        </button>
-                    </div>
-                </div>
+<main class="container main-grid">
+    <section class="panel input-panel">
+        <div class="section-heading">
+            <div>
+                <p class="step">Entrada desde el front-end</p>
+                <h2>Seleccione o escriba una oración</h2>
             </div>
         </div>
 
-        <!-- Resultados -->
-        <div id="resultados" style="display:none;">
-            <!-- Badges de clasificacion -->
-            <div class="row mb-4">
-                <div class="col-md-3 mb-2">
-                    <div class="card text-center shadow-sm border-0">
-                        <div class="card-body">
-                            <small class="text-muted">Tipo de Oracion</small>
-                            <div><span id="badgeTipo" class="badge bg-primary badge-tipo mt-1">-</span></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-2">
-                    <div class="card text-center shadow-sm border-0">
-                        <div class="card-body">
-                            <small class="text-muted">Relacion Sintactica</small>
-                            <div><span id="badgeSubtipo" class="badge bg-info badge-tipo mt-1">-</span></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-2">
-                    <div class="card text-center shadow-sm border-0">
-                        <div class="card-body">
-                            <small class="text-muted">Conector Detectado</small>
-                            <div><span id="badgeConector" class="badge bg-warning text-dark badge-tipo mt-1">-</span></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-2">
-                    <div class="card text-center shadow-sm border-0">
-                        <div class="card-body">
-                            <small class="text-muted">Sentimiento</small>
-                            <div><span id="badgeSentiment" class="badge badge-tipo mt-1">-</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <label for="sampleSentence">Oraciones solicitadas en las guías</label>
+        <select id="sampleSentence">
+            <option value="">Seleccione una oración…</option>
+            <option>María estudia todos los días.</option>
+            <option>María estudia porque mañana tiene un examen.</option>
+            <option>Pedro llegó y Ana salió.</option>
+            <option>Aunque llueve iremos al parque.</option>
+            <option>Si estudias aprobarás.</option>
+            <option>Juan cocina mientras Ana limpia.</option>
+            <option>Pedro compró un automóvil.</option>
+            <option>Ana cocina la cena.</option>
+            <option>Luis juega fútbol.</option>
+            <option>El carro del vecino vuela.</option>
+            <option>El avión vuela.</option>
+        </select>
 
-            <!-- Actividad 3: SVO -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card card-resultado shadow-sm">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Actividad 3 - Sujeto, Verbo y Objeto</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center">
-                                <div class="col-md-4 mb-2">
-                                    <div class="p-3 bg-light rounded">
-                                        <small class="text-muted d-block">Sujeto</small>
-                                        <strong id="svoSujeto" class="fs-4 text-primary">-</strong>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 mb-2">
-                                    <div class="p-3 bg-light rounded">
-                                        <small class="text-muted d-block">Verbo Principal</small>
-                                        <strong id="svoVerbo" class="fs-4 text-success">-</strong>
-                                    </div>
-                                </div>
-                                <div class="col-md-4 mb-2">
-                                    <div class="p-3 bg-light rounded">
-                                        <small class="text-muted d-block">Objeto Directo</small>
-                                        <strong id="svoObjeto" class="fs-4 text-danger">-</strong>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Clasificacion Semantica: Entidades NER -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card card-resultado shadow-sm">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Clasificacion Semantica - Entidades Nombradas (NER)</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <h6><span class="badge bg-secondary">CoreNLP</span></h6>
-                                    <div id="nerCoreNLP" class="mb-3">No se detectaron entidades</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <h6><span class="badge bg-success">spaCy</span></h6>
-                                    <div id="nerSpacy">No se detectaron entidades</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                <!-- Tokens y POS Tags -->
-                <div class="col-lg-6 mb-4">
-                    <div class="card card-resultado shadow-sm h-100">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Tokens y POS Tags <span class="badge bg-secondary">CoreNLP</span></h5>
-                        </div>
-                        <div class="card-body" style="max-height:350px; overflow-y:auto;">
-                            <table class="table table-sm table-striped tabla-resultado">
-                                <thead><tr><th>#</th><th>Token</th><th>POS</th></tr></thead>
-                                <tbody id="tablaTokensCN"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Dependencias Sintacticas -->
-                <div class="col-lg-6 mb-4">
-                    <div class="card card-resultado shadow-sm h-100">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Dependencias Sintacticas <span class="badge bg-secondary">CoreNLP</span></h5>
-                        </div>
-                        <div class="card-body" style="max-height:350px; overflow-y:auto;">
-                            <table class="table table-sm table-striped tabla-resultado">
-                                <thead><tr><th>Relacion</th><th>Gobernante</th><th>Dependiente</th></tr></thead>
-                                <tbody id="tablaDepsCN"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Arbol Sintactico -->
-            <div class="row mb-4">
-                <div class="col-md-6 mb-4">
-                    <div class="card card-resultado shadow-sm h-100">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Arbol Sintactico (Parse Tree) <span class="badge bg-secondary">CoreNLP</span></h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="arbolContainer" class="arbol-box">Arbol no disponible</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6 mb-4">
-                    <div class="card card-resultado shadow-sm h-100">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Arbol de Dependencias <span class="badge bg-success">spaCy</span></h5>
-                        </div>
-                        <div class="card-body">
-                            <div id="arbolSpacyContainer" class="arbol-box">Arbol no disponible</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Benchmark spaCy -->
-            <div class="row mb-4">
-                <div class="col-12">
-                    <div class="card card-resultado shadow-sm">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0">Analisis spaCy <span class="badge bg-success">Benchmark</span></h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <span class="badge bg-dark fs-6">Tiempo de ejecucion: <span id="spacyTiempo">-</span> ms</span>
-                            </div>
-                            <div class="row">
-                                <div class="col-lg-6">
-                                    <h6>Tokens y POS Tags (spaCy)</h6>
-                                    <div style="max-height:300px; overflow-y:auto;">
-                                        <table class="table table-sm table-striped tabla-resultado">
-                                            <thead><tr><th>#</th><th>Token</th><th>POS</th><th>Lema</th></tr></thead>
-                                            <tbody id="tablaTokensSpacy"></tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div class="col-lg-6">
-                                    <h6>Dependencias (spaCy)</h6>
-                                    <div style="max-height:300px; overflow-y:auto;">
-                                        <table class="table table-sm table-striped tabla-resultado">
-                                            <thead><tr><th>Relacion</th><th>Gobernante</th><th>Dependiente</th></tr></thead>
-                                            <tbody id="tablaDepsSpacy"></tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <label for="textInput">Texto que se analizará</label>
+        <textarea id="textInput" rows="4" maxlength="1500" placeholder="Ejemplo: Pedro llegó y Ana salió."></textarea>
+        <div class="input-actions">
+            <small id="counter">0 / 1500</small>
+            <button id="analyzeButton" type="button">Analizar oración</button>
         </div>
+        <div id="message" class="message hidden" role="alert"></div>
+    </section>
 
-        <!-- Mensaje de error -->
-        <div id="errorContainer" class="alert alert-danger" style="display:none;"></div>
-    </div>
+    <section id="results" class="results hidden" aria-live="polite">
+        <div id="summaryCards" class="summary-grid"></div>
 
-    <footer class="text-center text-muted py-3 border-top">
-        <small>Practica 16 - Teoria de Automatas y Computabilidad Avanzada | Julio 2026</small>
-    </footer>
+        <section class="panel">
+            <div class="section-heading">
+                <div>
+                    <p class="step">Actividad 4 y 5</p>
+                    <h2>Relación semántica entre proposiciones</h2>
+                </div>
+            </div>
+            <div id="classificationDetails"></div>
+        </section>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        function cargarOracion() {
-            const sel = document.getElementById("selectOracion");
-            const textarea = document.getElementById("textoEntrada");
-            if (sel.value) {
-                textarea.value = sel.value;
-            }
-        }
+        <section class="panel">
+            <div class="section-heading">
+                <div>
+                    <p class="step">Actividad 3 y análisis de proposiciones</p>
+                    <h2>Sujeto, verbo y objeto directo</h2>
+                </div>
+            </div>
+            <div class="tool-columns">
+                <article>
+                    <h3><span class="tool-dot spacy-dot"></span>spaCy</h3>
+                    <div id="spacyPropositions"></div>
+                </article>
+                <article>
+                    <h3><span class="tool-dot core-dot"></span>Stanford CoreNLP</h3>
+                    <div id="corePropositions"></div>
+                </article>
+            </div>
+        </section>
 
-        async function analizarTexto() {
-            const texto = document.getElementById("textoEntrada").value.trim();
-            if (!texto) {
-                mostrarError("Por favor ingrese o seleccione una oracion.");
-                return;
-            }
+        <section class="panel semantic-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="step">Análisis semántico contextual</p>
+                    <h2>Coherencia de sujeto, verbo y objeto</h2>
+                    <p class="note">Se aplican restricciones de selección explicables para comprobar si los roles son compatibles con el significado literal del verbo.</p>
+                </div>
+            </div>
+            <div id="semanticOverview"></div>
+            <div id="semanticPropositions" class="semantic-grid"></div>
+            <p id="semanticLimitations" class="semantic-limitations"></p>
+        </section>
 
-            ocultarError();
-            document.getElementById("resultados").style.display = "none";
-            document.getElementById("loading").style.display = "inline-block";
-            document.getElementById("btnAnalizar").disabled = true;
+        <section class="panel">
+            <div class="section-heading">
+                <div>
+                    <p class="step">Análisis léxico y dependencias</p>
+                    <h2>Tokens, lemas, POS y relaciones sintácticas</h2>
+                </div>
+            </div>
+            <div class="tool-block">
+                <h3><span class="tool-dot spacy-dot"></span>Resultados de spaCy</h3>
+                <div id="spacyError"></div>
+                <div class="table-wrap"><table id="spacyTokens"></table></div>
+            </div>
+            <div class="tool-block">
+                <h3><span class="tool-dot core-dot"></span>Resultados de Stanford CoreNLP</h3>
+                <div id="coreError"></div>
+                <div class="table-wrap"><table id="coreTokens"></table></div>
+            </div>
+        </section>
 
-            try {
-                const resp = await fetch("/analizar", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ texto: texto }),
-                });
+        <section class="panel tree-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="step">Árboles sintácticos interactivos</p>
+                    <h2>Visualización clara de la estructura</h2>
+                    <p class="note tree-help">Use los botones para acercar, alejar, ajustar o ampliar. En CoreNLP puede pulsar un nodo para contraer o desplegar sus hijos.</p>
+                </div>
+            </div>
 
-                const data = await resp.json();
+            <div class="tree-section">
+                <div class="tree-section-title">
+                    <div>
+                        <h3><span class="tool-dot spacy-dot"></span>spaCy · Árbol de dependencias</h3>
+                        <p class="note">Las flechas muestran qué palabra gobierna a cada token y la etiqueta indica la relación sintáctica.</p>
+                    </div>
+                    <div class="tree-legend" aria-label="Leyenda de spaCy">
+                        <span><i class="legend-word"></i>Palabra</span>
+                        <span><i class="legend-relation"></i>Relación</span>
+                        <span><i class="legend-arrow"></i>Dependencia</span>
+                    </div>
+                </div>
+                <div id="displacyTree" class="tree-gallery"></div>
+            </div>
 
-                if (data.error) {
-                    mostrarError(data.error);
-                    return;
-                }
+            <div class="tree-section">
+                <div class="tree-section-title">
+                    <div>
+                        <h3><span class="tool-dot core-dot"></span>Stanford CoreNLP · Árbol de constituyentes</h3>
+                        <p class="note">Los niveles representan grupos sintácticos; las hojas verdes son las palabras originales.</p>
+                    </div>
+                    <div class="tree-legend" aria-label="Leyenda de CoreNLP">
+                        <span><i class="legend-root"></i>Raíz</span>
+                        <span><i class="legend-group"></i>Grupo</span>
+                        <span><i class="legend-tag"></i>Etiqueta POS</span>
+                        <span><i class="legend-leaf"></i>Palabra</span>
+                    </div>
+                </div>
+                <div id="coreTrees" class="tree-gallery"></div>
+            </div>
+        </section>
 
-                renderizarResultados(data);
-            } catch (err) {
-                mostrarError("Error de conexion: " + err.message);
-            } finally {
-                document.getElementById("loading").style.display = "none";
-                document.getElementById("btnAnalizar").disabled = false;
-            }
-        }
+        <section class="panel">
+            <div class="section-heading">
+                <div>
+                    <p class="step">Actividad 6</p>
+                    <h2>Comparación entre ambas herramientas</h2>
+                </div>
+            </div>
+            <div class="table-wrap"><table id="comparisonTable"></table></div>
+            <p id="comparisonNote" class="note"></p>
+        </section>
+    </section>
+</main>
 
-        function renderizarResultados(data) {
-            const cn = data.corenlp || {};
-            const sp = data.spacy || {};
-
-            // Clasificacion
-            if (cn.clasificacion) {
-                document.getElementById("badgeTipo").textContent = cn.clasificacion.tipo;
-                document.getElementById("badgeSubtipo").textContent = cn.clasificacion.subtipo;
-                document.getElementById("badgeConector").textContent = cn.clasificacion.conector;
-            }
-
-            // Sentiment
-            if (cn.sentiment) {
-                const badgeSentiment = document.getElementById("badgeSentiment");
-                badgeSentiment.textContent = cn.sentiment;
-                const sentimentColors = {
-                    "Very positive": "bg-success",
-                    "Positive": "bg-info",
-                    "Neutral": "bg-secondary",
-                    "Negative": "bg-warning text-dark",
-                    "Very negative": "bg-danger"
-                };
-                badgeSentiment.className = "badge badge-tipo mt-1 " + (sentimentColors[cn.sentiment] || "bg-secondary");
-            }
-
-            // SVO
-            if (cn.svo) {
-                document.getElementById("svoSujeto").textContent = cn.svo.sujeto;
-                document.getElementById("svoVerbo").textContent = cn.svo.verbo;
-                document.getElementById("svoObjeto").textContent = cn.svo.objeto;
-            }
-
-            // Entidades NER CoreNLP
-            const nerCN = document.getElementById("nerCoreNLP");
-            if (cn.entidades && cn.entidades.length > 0) {
-                nerCN.innerHTML = cn.entidades.map(e =>
-                    `<span class="badge bg-primary me-1 mb-1">${e.texto} <small>(${e.tipo})</small></span>`
-                ).join("");
-            } else {
-                nerCN.innerHTML = '<span class="text-muted">No se detectaron entidades</span>';
-            }
-
-            // Entidades NER spaCy
-            const nerSp = document.getElementById("nerSpacy");
-            if (sp.entidades && sp.entidades.length > 0) {
-                nerSp.innerHTML = sp.entidades.map(e =>
-                    `<span class="badge bg-success me-1 mb-1">${e.texto} <small>(${e.tipo})</small></span>`
-                ).join("");
-            } else {
-                nerSp.innerHTML = '<span class="text-muted">No se detectaron entidades</span>';
-            }
-
-            // Tokens CoreNLP
-            const tbodyTokens = document.getElementById("tablaTokensCN");
-            tbodyTokens.innerHTML = "";
-            if (cn.tokens_pos) {
-                cn.tokens_pos.forEach((t, i) => {
-                    tbodyTokens.innerHTML += `<tr><td>${i + 1}</td><td>${t.token}</td><td><code>${t.pos}</code></td></tr>`;
-                });
-            }
-
-            // Dependencias CoreNLP
-            const tbodyDeps = document.getElementById("tablaDepsCN");
-            tbodyDeps.innerHTML = "";
-            if (cn.dependencias) {
-                cn.dependencias.forEach(d => {
-                    tbodyDeps.innerHTML += `<tr><td><code>${d.relacion}</code></td><td>${d.gobernante}</td><td>${d.dependiente}</td></tr>`;
-                });
-            }
-
-            // Arbol sintactico CoreNLP
-            document.getElementById("arbolContainer").textContent = cn.arbol || "Arbol no disponible";
-
-            // Arbol de dependencias spaCy
-            document.getElementById("arbolSpacyContainer").textContent = sp.arbol_dep || "Arbol no disponible";
-
-            // spaCy tiempo
-            document.getElementById("spacyTiempo").textContent = sp.tiempo_ms !== undefined ? sp.tiempo_ms : "-";
-
-            // Tokens spaCy
-            const tbodyTokensSp = document.getElementById("tablaTokensSpacy");
-            tbodyTokensSp.innerHTML = "";
-            if (sp.tokens_pos) {
-                sp.tokens_pos.forEach((t, i) => {
-                    tbodyTokensSp.innerHTML += `<tr><td>${i + 1}</td><td>${t.token}</td><td><code>${t.pos}</code></td><td>${t.lema}</td></tr>`;
-                });
-            }
-
-            // Dependencias spaCy
-            const tbodyDepsSp = document.getElementById("tablaDepsSpacy");
-            tbodyDepsSp.innerHTML = "";
-            if (sp.dependencias) {
-                sp.dependencias.forEach(d => {
-                    tbodyDepsSp.innerHTML += `<tr><td><code>${d.relacion}</code></td><td>${d.gobernante}</td><td>${d.dependiente}</td></tr>`;
-                });
-            }
-
-            document.getElementById("resultados").style.display = "block";
-        }
-
-        function mostrarError(msg) {
-            const c = document.getElementById("errorContainer");
-            c.textContent = msg;
-            c.style.display = "block";
-        }
-
-        function ocultarError() {
-            document.getElementById("errorContainer").style.display = "none";
-        }
-    </script>
+<footer>
+    <div class="container">APE 15–16 · Universidad Nacional de Loja · Julio 2026</div>
+</footer>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

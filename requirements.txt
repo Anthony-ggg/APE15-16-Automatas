@@ -1,4 +1,5 @@
-flask
-requests
-spacy
-stanza
+Flask>=3.0,<4
+requests>=2.31,<3
+spacy>=3.7.5,<4
+psutil>=5.9,<8
+pytest>=8,<9
